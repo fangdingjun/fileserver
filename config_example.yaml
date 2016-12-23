@@ -1,6 +1,12 @@
+# vim: set ft=yaml:
+#
+# server config file
 
 # document root
 docroot: /var/www/html
+
+# used for http2 to determine local path request
+# or proxy request
 localdomains:
     - www.simicloud.com
     - localhost
@@ -9,10 +15,14 @@ localdomains:
 # listener
 listen:
     -
+        # listen address
         host: 0.0.0.0
+
+        # listen port
         port: 80
-        # enable proxy
-        enableproxy: true
+
+        # enable proxy or not
+        enableproxy: false
     - 
         host: 0.0.0.0
         port: 443
@@ -25,39 +35,50 @@ listen:
 # url rules
 urlrules:
     -
+      # alias map url to path
       urlprefix: /robots.txt
+
       # available type: alias, fastcgi, uwsgi, http
       type: alias
+
+      # target
       target:
-          # availabe type for alias: file, dir
+          # availabe target type for alias: file, dir
           type: file
           path: /home/aaa/robots.txt
     - 
+      # alias map url to path
       urlprefix: /cc
       type: alias
       target:
           type: dir
           path: /home/cc
     -
+        # pass to uwsgi server
         urlprefix: /media
         type: uwsgi
         target: 
-            # available type for uwsgi: unix, tcp
+            # available target type for uwsgi: unix, tcp
             type: unix
             path: /path/to/media.sock
     -
+        # pass all php script to fastcgi server
         urlprefix: \.php$|\.php/
+
+        # use regex to match the url
         isregex: true
+
         type: fastcgi
         target: 
-            # available type for fastcgi: unix, tcp
+            # available target type for fastcgi: unix, tcp
             type: unix
             path: /path/to/php.sock
     -
-        urlprefix: /o
+        urlprefix: /auth
+        # http resverse proxy
         type: http
         target: 
-            # available type for http: http, unix
+            # available http type for http: http, unix
             type: http
             host: 127.0.0.1
             port: 8080
