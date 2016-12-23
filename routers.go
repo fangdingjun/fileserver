@@ -8,7 +8,7 @@ import (
 	"os"
 	"regexp"
 	//"path/filepath"
-	//"strings"
+	"strings"
 )
 
 func initRouters(cfg *conf) {
@@ -46,13 +46,17 @@ func registerAliasHandler(r rule, router *mux.Router) {
 	}
 }
 func registerFileHandler(r rule, router *mux.Router) {
-	router.HandleFunc(r.URLPrefix, func(w http.ResponseWriter, req *http.Request) {
-		http.ServeFile(w, req, r.Target.Path)
-	})
+	router.HandleFunc(r.URLPrefix,
+		func(w http.ResponseWriter, req *http.Request) {
+			http.ServeFile(w, req, r.Target.Path)
+		})
 }
 
 func registerDirHandler(r rule, router *mux.Router) {
-	router.PathPrefix(r.URLPrefix).Handler(http.FileServer(http.Dir(r.Target.Path)))
+	p := strings.TrimRight(r.URLPrefix, "/")
+	router.PathPrefix(r.URLPrefix).Handler(
+		http.StripPrefix(p,
+			http.FileServer(http.Dir(r.Target.Path))))
 }
 
 func registerUwsgiHandler(r rule, router *mux.Router) {
@@ -100,16 +104,20 @@ func registerFastCGIHandler(r rule, docroot string, router *mux.Router) {
 
 func registerHTTPHandler(r rule, router *mux.Router) {
 	var u http.Handler
+	var addr string
 	switch r.Target.Type {
 	case "unix":
-		u = newProxy(r.Target.Path, r.URLPrefix)
+		addr = r.Target.Path
 	case "http":
-		u = newProxy(fmt.Sprintf("%s:%d", r.Target.Host, r.Target.Port), r.URLPrefix)
+		addr = fmt.Sprintf("%s:%d", r.Target.Host, r.Target.Port)
 	default:
 		fmt.Printf("invalid scheme: %s, only support unix, http", r.Target.Type)
 		os.Exit(-1)
 	}
-	router.PathPrefix(r.URLPrefix).Handler(u)
+	u = newProxy(addr, r.URLPrefix)
+	p := strings.TrimRight(r.URLPrefix, "/")
+	router.PathPrefix(r.URLPrefix).Handler(
+		http.StripPrefix(p, u))
 }
 
 type myURLMatch struct {
