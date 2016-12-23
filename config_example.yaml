@@ -1,0 +1,59 @@
+
+# document root
+docroot: /var/www/html
+
+# listener
+listen:
+    -
+        host: 0.0.0.0
+        port: 80
+        # enable proxy
+        enableproxy: true
+    - 
+        host: 0.0.0.0
+        port: 443
+        # server certificate
+        cert: server.crt
+        # server private key
+        key: server.key
+        enableproxy: false
+
+# url rules
+urlrules:
+    -
+      urlprefix: /robots.txt
+      # available type: alias, fastcgi, uwsgi, http
+      type: alias
+      target:
+          # availabe type for alias: file, dir
+          type: file
+          path: /home/aaa/robots.txt
+    - 
+      urlprefix: /cc
+      type: alias
+      target:
+          type: dir
+          path: /home/cc
+    -
+        urlprefix: /media
+        type: uwsgi
+        target: 
+            # available type for uwsgi: unix, tcp
+            type: unix
+            path: /path/to/media.sock
+    -
+        urlprefix: \.php$|\.php/
+        isregex: true
+        type: fastcgi
+        target: 
+            # available type for fastcgi: unix, tcp
+            type: unix
+            path: /path/to/php.sock
+    -
+        urlprefix: /o
+        type: http
+        target: 
+            # available type for http: http, unix
+            type: http
+            host: 127.0.0.1
+            port: 8080
