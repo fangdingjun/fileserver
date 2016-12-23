@@ -102,7 +102,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.ProtoMarjor == 1 {
+	if r.ProtoMajor == 1 {
 		// HTTP/1.1
 		hj, _ := w.(http.Hijacker)
 		conn1, _, _ := hj.Hijack()
