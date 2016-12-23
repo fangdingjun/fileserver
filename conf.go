@@ -13,7 +13,7 @@ type conf struct {
 
 type listen struct {
 	Host        string
-	Port        string
+	Port        int
 	Cert        string
 	Key         string
 	EnableProxy bool
