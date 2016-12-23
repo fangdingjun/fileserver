@@ -47,6 +47,12 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 	r.Header.Del("proxy-connection")
 
+	if r.ProtoMajor == 2 {
+		r.URL.Scheme = "http"
+		r.URL.Host = r.Host
+		r.RequestURI = r.URL.String()
+	}
+
 	resp, err = defaultTransport.RoundTrip(r)
 	if err != nil {
 		log.Printf("RoundTrip: %s", err)
@@ -60,7 +66,7 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 	hdr := w.Header()
 
-	//resp.Header.Del("connection")
+	resp.Header.Del("connection")
 
 	for k, v := range resp.Header {
 		for _, v1 := range v {
@@ -75,6 +81,11 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	host := r.RequestURI
+
+	if r.ProtoMajor == 2 {
+		host = r.URL.Host
+	}
+
 	if !strings.Contains(host, ":") {
 		host = fmt.Sprintf("%s:443", host)
 	}
@@ -91,12 +102,35 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hj, _ := w.(http.Hijacker)
-	conn1, _, _ := hj.Hijack()
+	if r.ProtoMarjor == 1 {
+		// HTTP/1.1
+		hj, _ := w.(http.Hijacker)
+		conn1, _, _ := hj.Hijack()
 
-	fmt.Fprintf(conn1, "%s 200 connection established\r\n\r\n", r.Proto)
+		fmt.Fprintf(conn1, "%s 200 connection established\r\n\r\n", r.Proto)
 
-	pipeAndClose(conn, conn1)
+		pipeAndClose(conn, conn1)
+		return
+	}
+
+	// HTTP/2.0
+	defer conn.Close()
+
+	w.WriteHeader(http.StatusOK)
+	w.(http.Flusher).Flush()
+
+	ch := make(chan int, 2)
+	go func() {
+		io.Copy(conn, r.Body)
+		ch <- 1
+	}()
+
+	go func() {
+		io.Copy(w, conn)
+		ch <- 1
+	}()
+
+	<-ch
 }
 
 func pipeAndClose(r1, r2 io.ReadWriteCloser) {
