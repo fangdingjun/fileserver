@@ -36,7 +36,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if !h.enableProxy {
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "<h1>page not found!</h1>")
+		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
 		return
 	}
 
