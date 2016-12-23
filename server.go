@@ -28,7 +28,7 @@ func initListeners(c *conf) {
 
 func main() {
 	var configfile string
-	flag.StringVar(&configfile, "-c", "config.yaml", "config file")
+	flag.StringVar(&configfile, "c", "config.yaml", "config file")
 	flag.Parse()
 	c, err := loadConfig(configfile)
 	if err != nil {
