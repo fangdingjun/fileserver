@@ -6,9 +6,10 @@ import (
 )
 
 type conf struct {
-	Listen   []listen
-	Docroot  string
-	URLRules []rule
+	Listen       []listen
+	Docroot      string
+	URLRules     []rule
+	LocalDomains []string
 }
 
 type listen struct {

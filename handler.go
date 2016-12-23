@@ -11,7 +11,8 @@ import (
 )
 
 type handler struct {
-	enableProxy bool
+	enableProxy  bool
+	localDomains []string
 }
 
 var defaultTransport http.RoundTripper = &http.Transport{
@@ -23,7 +24,12 @@ var defaultTransport http.RoundTripper = &http.Transport{
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.RequestURI[0] == '/' {
+	if r.ProtoMajor == 1 && r.RequestURI[0] == '/' {
+		http.DefaultServeMux.ServeHTTP(w, r)
+		return
+	}
+
+	if r.ProtoMajor == 2 && h.isLocalRequest(r) {
 		http.DefaultServeMux.ServeHTTP(w, r)
 		return
 	}
@@ -33,6 +39,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<h1>page not found!</h1>")
 		return
 	}
+
 	if r.Method == http.MethodConnect {
 		h.handleCONNECT(w, r)
 	} else {
@@ -51,6 +58,11 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		r.URL.Scheme = "http"
 		r.URL.Host = r.Host
 		r.RequestURI = r.URL.String()
+		if r.Method != http.MethodPost && r.Method != http.MethodPut {
+			r.ContentLength = 0
+			r.Body.Close()
+			r.Body = nil
+		}
 	}
 
 	resp, err = defaultTransport.RoundTrip(r)
@@ -77,6 +89,16 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 
 	io.Copy(w, resp.Body)
+}
+
+type flushWriter struct {
+	w io.Writer
+}
+
+func (fw flushWriter) Write(buf []byte) (int, error) {
+	n, err := fw.w.Write(buf)
+	fw.w.(http.Flusher).Flush()
+	return n, err
 }
 
 func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
@@ -126,13 +148,31 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	go func() {
-		io.Copy(w, conn)
+		io.Copy(flushWriter{w}, conn)
 		ch <- 1
 	}()
 
 	<-ch
 }
 
+func (h *handler) isLocalRequest(r *http.Request) bool {
+	if len(h.localDomains) == 0 {
+		return true
+	}
+
+	host := r.Host
+	if h1, _, err := net.SplitHostPort(r.Host); err == nil {
+		host = h1
+	}
+
+	for _, s := range h.localDomains {
+		if strings.HasSuffix(host, s) {
+			return true
+		}
+	}
+
+	return false
+}
 func pipeAndClose(r1, r2 io.ReadWriteCloser) {
 	ch := make(chan int, 2)
 	go func() {

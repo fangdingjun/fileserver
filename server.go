@@ -11,14 +11,13 @@ func initListeners(c *conf) {
 	for _, l := range c.Listen {
 		go func(l listen) {
 			addr := fmt.Sprintf("%s:%d", l.Host, l.Port)
+			h := &handler{enableProxy: l.EnableProxy, localDomains: c.LocalDomains}
 			if l.Cert != "" && l.Key != "" {
-				if err := http.ListenAndServeTLS(addr, l.Cert, l.Key,
-					&handler{enableProxy: l.EnableProxy}); err != nil {
+				if err := http.ListenAndServeTLS(addr, l.Cert, l.Key, h); err != nil {
 					log.Fatal(err)
 				}
 			} else {
-				if err := http.ListenAndServe(addr,
-					&handler{enableProxy: l.EnableProxy}); err != nil {
+				if err := http.ListenAndServe(addr, h); err != nil {
 					log.Fatal(err)
 				}
 			}

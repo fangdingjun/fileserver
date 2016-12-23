@@ -1,6 +1,10 @@
 
 # document root
 docroot: /var/www/html
+localdomains:
+    - www.simicloud.com
+    - localhost
+    - 127.0.0.1
 
 # listener
 listen:
