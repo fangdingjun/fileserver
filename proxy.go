@@ -5,11 +5,11 @@ import (
 	"net"
 	"net/http"
 	//"bufio"
+	//"fmt"
 	"io"
 	"log"
-	"strings"
-	"time"
 	//"strings"
+	"time"
 )
 
 type proxy struct {
@@ -34,7 +34,8 @@ func newProxy(addr string, prefix string) *proxy {
 	return p
 }
 
-func (p *proxy) dialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+func (p *proxy) dialContext(ctx context.Context,
+	network, addr string) (net.Conn, error) {
 	return p.dialer.DialContext(ctx, network, p.addr)
 }
 
@@ -45,10 +46,8 @@ func (p *proxy) dial(network, addr string) (conn net.Conn, err error) {
 func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	r.Header.Add("X-Forwarded-For", host)
-	r.RequestURI = strings.TrimLeft(r.RequestURI, p.prefix)
-	//r.URL.Scheme = "http"
-	//r.URL.Host = r.Host
-	r.URL.Path = strings.TrimLeft(r.URL.Path, p.prefix)
+	r.URL.Scheme = "http"
+	r.URL.Host = r.Host
 	resp, err := p.transport.RoundTrip(r)
 	if err != nil {
 		log.Print(err)
