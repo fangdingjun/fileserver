@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+// handler process the proxy request first(if enabled)
+// and route the request to the registered http.Handler
 type handler struct {
 	handler      http.Handler
 	enableProxy  bool
@@ -24,7 +26,9 @@ var defaultTransport http.RoundTripper = &http.Transport{
 	//ResponseHeaderTimeout: 2 * time.Second,
 }
 
+// ServeHTTP implements the http.Handler interface
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// http/1.1 local request
 	if r.ProtoMajor == 1 && r.RequestURI[0] == '/' {
 		if h.handler != nil {
 			h.handler.ServeHTTP(w, r)
@@ -34,6 +38,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// http/2.0 local request
 	if r.ProtoMajor == 2 && h.isLocalRequest(r) {
 		if h.handler != nil {
 			h.handler.ServeHTTP(w, r)
@@ -43,6 +48,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// proxy request
+
 	if !h.enableProxy {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
@@ -50,8 +57,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodConnect {
+		// CONNECT request
 		h.handleCONNECT(w, r)
 	} else {
+		// GET, POST, PUT, ....
 		h.handleHTTP(w, r)
 	}
 }
@@ -96,7 +105,6 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(resp.StatusCode)
-
 	io.Copy(w, resp.Body)
 }
 
@@ -145,6 +153,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// HTTP/2.0
+
 	defer conn.Close()
 
 	w.WriteHeader(http.StatusOK)
@@ -164,7 +173,13 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	<-ch
 }
 
+// isLocalRequest determine the http2 request is local path request
+// or the proxy request
 func (h *handler) isLocalRequest(r *http.Request) bool {
+	if !h.enableProxy {
+		return true
+	}
+
 	if len(h.localDomains) == 0 {
 		return true
 	}
@@ -182,6 +197,7 @@ func (h *handler) isLocalRequest(r *http.Request) bool {
 
 	return false
 }
+
 func pipeAndClose(r1, r2 io.ReadWriteCloser) {
 	ch := make(chan int, 2)
 	go func() {
