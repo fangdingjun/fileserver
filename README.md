@@ -6,13 +6,13 @@ gserver is a golang http/https server
 features
 =======
 
-- support HTTP/1.1, HTTP/2.0
-- support serve static files
 - support UWSGI client protocol (python)
 - support fastCGI client protocol (php)
 - support act as resverse proxy
 - support act as forward proxy
-- support multiple locations
+- support multiple virtual host
+- support SNI (https virtual host)
+- support http/2.0 (only on https)
 
 usage
 ====
