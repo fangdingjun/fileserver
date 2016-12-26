@@ -36,7 +36,7 @@ func initRouters(cfg conf) {
 				}
 			}
 			r := router.Host(h2).Subrouter()
-			for _, rule := range h.UrlRules {
+			for _, rule := range h.URLRules {
 				switch rule.Type {
 				case "alias":
 					registerAliasHandler(rule, r)
@@ -54,7 +54,7 @@ func initRouters(cfg conf) {
 		}
 
 		// default host config
-		for _, rule := range l.UrlRules {
+		for _, rule := range l.URLRules {
 			switch rule.Type {
 			case "alias":
 				registerAliasHandler(rule, router)

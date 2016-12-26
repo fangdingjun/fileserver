@@ -11,7 +11,7 @@ type server struct {
 	Host        string
 	Port        int
 	Docroot     string
-	UrlRules    []rule
+	URLRules    []rule
 	EnableProxy bool
 	Vhost       []vhost
 }
@@ -21,7 +21,7 @@ type vhost struct {
 	Hostname string
 	Cert     string
 	Key      string
-	UrlRules []rule
+	URLRules []rule
 }
 
 type rule struct {
