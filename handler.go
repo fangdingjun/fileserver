@@ -11,6 +11,7 @@ import (
 )
 
 type handler struct {
+	handler      http.Handler
 	enableProxy  bool
 	localDomains []string
 }
@@ -25,12 +26,20 @@ var defaultTransport http.RoundTripper = &http.Transport{
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.ProtoMajor == 1 && r.RequestURI[0] == '/' {
-		http.DefaultServeMux.ServeHTTP(w, r)
+		if h.handler != nil {
+			h.handler.ServeHTTP(w, r)
+		} else {
+			http.DefaultServeMux.ServeHTTP(w, r)
+		}
 		return
 	}
 
 	if r.ProtoMajor == 2 && h.isLocalRequest(r) {
-		http.DefaultServeMux.ServeHTTP(w, r)
+		if h.handler != nil {
+			h.handler.ServeHTTP(w, r)
+		} else {
+			http.DefaultServeMux.ServeHTTP(w, r)
+		}
 		return
 	}
 

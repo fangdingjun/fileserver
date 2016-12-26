@@ -1,84 +1,129 @@
 # vim: set ft=yaml:
-#
-# server config file
 
-# document root
-docroot: /var/www/html
+# when provide certficate file, server will listen https and enable http2 
 
-# used for http2 to determine local path request
-# or proxy request
-localdomains:
-    - www.simicloud.com
-    - localhost
-    - 127.0.0.1
 
-# listener
-listen:
-    -
-        # listen address
-        host: 0.0.0.0
+# http config
+-
+    # listen address
+    host: 0.0.0.0
 
-        # listen port
-        port: 80
+    # listen port
+    port: 9001
 
-        # enable proxy or not
-        enableproxy: false
-    - 
-        host: 0.0.0.0
-        port: 443
-        # server certificate
-        cert: server.crt
-        # server private key
-        key: server.key
-        enableproxy: false
+    # default document root
+    docroot: /srv/www
 
-# url rules
-urlrules:
-    -
-      # alias map url to path
-      urlprefix: /robots.txt
+    enableproxy: false
+    
+    # default host's url rule
+    #urlrules:
+    #    -
+    #        urlprefix: /a
+    #        type: alias
+    #        target:
+    #            type: dir
+    #            path: /home/user1/a
+    #    -
+    #        urlprefix: /b/a.txt
+    #        type: alias
+    #        target:
+    #            type: file
+    #            path: /home/user1/a/b/a.txt
 
-      # available type: alias, fastcgi, uwsgi, http
-      type: alias
+    # virtual host config
+    vhost: 
+        - &example1_www
+           hostname: www.example1.com
+           docroot: /var/www/html/
+           # cert:
+           # key:
+           
+           # url rule for www.example.com
+           urlrules: 
+                -
+                    # url start with /APIv1/ forward to uwsg socket
+                    urlprefix: /APIv1/
+                    type: uwsgi
+                    target:
+                        type: unix
+                        path: /run/uwsgi/APIv1.sock
+                -
+                    # route php script to fastCGI socket
+                     urlprefix: /phpmyadmin/.*\.php$
 
-      # target
-      target:
-          # availabe target type for alias: file, dir
-          type: file
-          path: /home/aaa/robots.txt
-    - 
-      # alias map url to path
-      urlprefix: /cc
-      type: alias
-      target:
-          type: dir
-          path: /home/cc
-    -
-        # pass to uwsgi server
-        urlprefix: /media
-        type: uwsgi
-        target: 
-            # available target type for uwsgi: unix, tcp
-            type: unix
-            path: /path/to/media.sock
-    -
-        # pass all php script to fastcgi server
-        urlprefix: \.php$|\.php/
+                     # set to true means urlprefix is regex expression
+                     isregex: true
 
-        # use regex to match the url
-        isregex: true
+                     type: fastcgi
+                     target:
+                        type: unix
+                        path: /var/run/php-fpm/www.sock
+                - 
+                    # url start with /proxy/ forward to  http://10.10.1.1
+                    # this act as reverse proxy
+                    urlprefix:  /proxy/
+                    type: http
+                    target:
+                        type: http
+                        host: 10.10.1.1
+                        port: 8080
+        - &example1
+            <<: *example1_www
+            hostname: example1.com
 
-        type: fastcgi
-        target: 
-            # available target type for fastcgi: unix, tcp
-            type: unix
-            path: /path/to/php.sock
-    -
-        urlprefix: /auth
-        # http resverse proxy
-        type: http
-        target: 
-            # available http type for http: http, unix
-            type: http
-            host: 127.0.0.1
-            port: 8080
+        - &example_www
+           hostname: www.example.com
+           docroot: /var/www/example
+           urlrules: 
+              -
+                urlprefix: /APIv2
+                type: uwsgi
+                target:
+                    type: unix
+                    path: /run/uwsgi/APIv2.sock
+        - &example
+           <<: *example_www
+           hostname: example.com
+
+        - &example_bbs
+           hostname: bbs.example.com
+           docroot: /var/www/example_bbs/
+           urlrules: 
+              -
+                 #urlprefix: \.php$|\.php\/.*
+                 #isregex: true
+                 
+                 urlprefix: /
+                 type: fastcgi
+                 target:
+                    type: unix
+                    path: /var/run/php-fpm/www.sock
+
+# https config
+- 
+    host: 0.0.0.0
+    port: 9002
+    docroot: /srv/www
+    enableproxy: false
+    vhost: 
+        -
+           <<: *example1
+           cert: /home/user1/cert/example1.com.crt
+           key: /home/user1/cert/example1.com.key
+        -
+           <<: *example1_www
+           cert: /home/user1/cert/example1.com.crt
+           key: /home/user1/cert/example1.com.key
+        -
+           <<: *example_www
+           cert: /etc/letsencrypt/live/example.com/fullchain.pem
+           key: /etc/letsencrypt/live/example.com/privkey.pem
+        -
+           <<: *example
+           cert: /etc/letsencrypt/live/example.com/fullchain.pem
+           key: /etc/letsencrypt/live/example.com/privkey.pem
+        -
+           <<: *example_bbs
+           cert: /etc/letsencrypt/live/bbs.example.com/fullchain.pem
+           key: /etc/letsencrypt/live/bbs.example.com/privkey.pem

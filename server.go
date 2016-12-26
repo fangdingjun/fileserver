@@ -2,28 +2,10 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	//"fmt"
 	"log"
-	"net/http"
+	//"net/http"
 )
-
-func initListeners(c *conf) {
-	for _, l := range c.Listen {
-		go func(l listen) {
-			addr := fmt.Sprintf("%s:%d", l.Host, l.Port)
-			h := &handler{enableProxy: l.EnableProxy, localDomains: c.LocalDomains}
-			if l.Cert != "" && l.Key != "" {
-				if err := http.ListenAndServeTLS(addr, l.Cert, l.Key, h); err != nil {
-					log.Fatal(err)
-				}
-			} else {
-				if err := http.ListenAndServe(addr, h); err != nil {
-					log.Fatal(err)
-				}
-			}
-		}(l)
-	}
-}
 
 func main() {
 	var configfile string
@@ -34,6 +16,5 @@ func main() {
 		log.Fatal(err)
 	}
 	initRouters(c)
-	initListeners(c)
 	select {}
 }

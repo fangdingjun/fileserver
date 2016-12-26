@@ -1,37 +1,108 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/gorilla/mux"
+	"net"
 	"net/http"
 	//"net/url"
+	"log"
 	"os"
 	"regexp"
 	//"path/filepath"
 	"strings"
 )
 
-func initRouters(cfg *conf) {
-	router := mux.NewRouter()
+func initRouters(cfg conf) {
 
-	for _, r := range cfg.URLRules {
-		switch r.Type {
-		case "alias":
-			registerAliasHandler(r, router)
-		case "uwsgi":
-			registerUwsgiHandler(r, router)
-		case "fastcgi":
-			registerFastCGIHandler(r, cfg.Docroot, router)
-		case "http":
-			registerHTTPHandler(r, router)
-		default:
-			fmt.Printf("invalid type: %s\n", r.Type)
+	for _, l := range cfg {
+		router := mux.NewRouter()
+		domains := []string{}
+		certs := []tls.Certificate{}
+
+		// initial virtual host
+		for _, h := range l.Vhost {
+			h2 := h.Hostname
+			if h1, _, err := net.SplitHostPort(h.Hostname); err == nil {
+				h2 = h1
+			}
+			domains = append(domains, h2)
+			if h.Cert != "" && h.Key != "" {
+				if cert, err := tls.LoadX509KeyPair(h.Cert, h.Key); err == nil {
+					certs = append(certs, cert)
+				} else {
+					log.Fatal(err)
+				}
+			}
+			r := router.Host(h2).Subrouter()
+			for _, rule := range h.UrlRules {
+				switch rule.Type {
+				case "alias":
+					registerAliasHandler(rule, r)
+				case "uwsgi":
+					registerUwsgiHandler(rule, r)
+				case "fastcgi":
+					registerFastCGIHandler(rule, h.Docroot, r)
+				case "http":
+					registerHTTPHandler(rule, r)
+				default:
+					fmt.Printf("invalid type: %s\n", rule.Type)
+				}
+			}
+			r.PathPrefix("/").Handler(http.FileServer(http.Dir(h.Docroot)))
 		}
+
+		// default host config
+		for _, rule := range l.UrlRules {
+			switch rule.Type {
+			case "alias":
+				registerAliasHandler(rule, router)
+			case "uwsgi":
+				registerUwsgiHandler(rule, router)
+			case "fastcgi":
+				registerFastCGIHandler(rule, l.Docroot, router)
+			case "http":
+				registerHTTPHandler(rule, router)
+			default:
+				fmt.Printf("invalid type: %s\n", rule.Type)
+			}
+		}
+
+		router.PathPrefix("/").Handler(http.FileServer(http.Dir(l.Docroot)))
+
+		go func(l server) {
+			addr := fmt.Sprintf("%s:%d", l.Host, l.Port)
+			hdlr := &handler{
+				handler:      router,
+				enableProxy:  l.EnableProxy,
+				localDomains: domains,
+			}
+			if len(certs) > 0 {
+				tlsconfig := &tls.Config{
+					Certificates: certs,
+				}
+
+				tlsconfig.BuildNameToCertificate()
+
+				srv := http.Server{
+					Addr:      addr,
+					TLSConfig: tlsconfig,
+					Handler:   hdlr,
+				}
+				log.Printf("listen https on %s", addr)
+				if err := srv.ListenAndServeTLS("", ""); err != nil {
+					log.Fatal(err)
+				}
+
+			} else {
+				log.Printf("listen http on %s", addr)
+				if err := http.ListenAndServe(addr, hdlr); err != nil {
+					log.Fatal(err)
+				}
+			}
+		}(l)
 	}
-
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir(cfg.Docroot)))
-
-	http.Handle("/", router)
 }
 
 func registerAliasHandler(r rule, router *mux.Router) {
@@ -45,6 +116,7 @@ func registerAliasHandler(r rule, router *mux.Router) {
 		os.Exit(-1)
 	}
 }
+
 func registerFileHandler(r rule, router *mux.Router) {
 	router.HandleFunc(r.URLPrefix,
 		func(w http.ResponseWriter, req *http.Request) {

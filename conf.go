@@ -5,19 +5,23 @@ import (
 	"io/ioutil"
 )
 
-type conf struct {
-	Listen       []listen
-	Docroot      string
-	URLRules     []rule
-	LocalDomains []string
-}
+type conf []server
 
-type listen struct {
+type server struct {
 	Host        string
 	Port        int
-	Cert        string
-	Key         string
+	Docroot     string
+	UrlRules    []rule
 	EnableProxy bool
+	Vhost       []vhost
+}
+
+type vhost struct {
+	Docroot  string
+	Hostname string
+	Cert     string
+	Key      string
+	UrlRules []rule
 }
 
 type rule struct {
@@ -34,7 +38,7 @@ type target struct {
 	Path string
 }
 
-func loadConfig(fn string) (*conf, error) {
+func loadConfig(fn string) (conf, error) {
 	data, err := ioutil.ReadFile(fn)
 	if err != nil {
 		return nil, err
@@ -45,5 +49,5 @@ func loadConfig(fn string) (*conf, error) {
 		return nil, err
 	}
 
-	return &c, nil
+	return c, nil
 }

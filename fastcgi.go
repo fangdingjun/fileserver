@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/yookoala/gofast"
 	"log"
 	"net"
@@ -35,6 +36,15 @@ func (f *FastCGI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // FastCGIPass pass the request to fastcgi socket
 func (f *FastCGI) FastCGIPass(w http.ResponseWriter, r *http.Request) {
+	// make sure server not access the file out of document root
+	p1 := filepath.Clean(filepath.Join(f.DocRoot, r.URL.Path))
+	p2 := filepath.Clean(f.DocRoot)
+	if !strings.HasPrefix(p1, p2) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "invalid url")
+		return
+	}
+
 	var scriptName, pathInfo, scriptFileName string
 
 	conn, err := net.Dial(f.Network, f.Addr)
@@ -58,7 +68,7 @@ func (f *FastCGI) FastCGIPass(w http.ResponseWriter, r *http.Request) {
 	if len(p) < 2 {
 		if strings.HasSuffix(r.URL.Path, "/") {
 			// redirect to index.php
-			scriptName = ""
+			scriptName = filepath.Join(r.URL.Path, "index.php")
 			pathInfo = ""
 			scriptFileName = filepath.Join(f.DocRoot, urlPath, "index.php")
 		} else {
@@ -75,6 +85,10 @@ func (f *FastCGI) FastCGIPass(w http.ResponseWriter, r *http.Request) {
 
 	req := client.NewRequest(r)
 
+	req.Params["DOCUMENT_URI"] = scriptName
+	req.Params["SCRIPT_NAME"] = scriptName
+	req.Params["PHP_SELF"] = scriptName
+	req.Params["DOCUMENT_ROOT"] = f.DocRoot
 	req.Params["PATH_INFO"] = pathInfo
 	req.Params["SCRIPT_FILENAME"] = scriptFileName
 
