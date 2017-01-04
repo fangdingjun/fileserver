@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/gorilla/mux"
+	"log"
 	"net"
 	"net/http"
-	//"net/url"
-	"log"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"regexp"
 	//"path/filepath"
@@ -44,7 +45,7 @@ func initRouters(cfg conf) {
 					registerUwsgiHandler(rule, r)
 				case "fastcgi":
 					registerFastCGIHandler(rule, h.Docroot, r)
-				case "http":
+				case "reverse":
 					registerHTTPHandler(rule, r)
 				default:
 					fmt.Printf("invalid type: %s\n", rule.Type)
@@ -62,7 +63,7 @@ func initRouters(cfg conf) {
 				registerUwsgiHandler(rule, router)
 			case "fastcgi":
 				registerFastCGIHandler(rule, l.Docroot, router)
-			case "http":
+			case "reverse":
 				registerHTTPHandler(rule, router)
 			default:
 				fmt.Printf("invalid type: %s\n", rule.Type)
@@ -180,13 +181,19 @@ func registerHTTPHandler(r rule, router *mux.Router) {
 	switch r.Target.Type {
 	case "unix":
 		addr = r.Target.Path
+		u = newProxy(addr, r.URLPrefix)
 	case "http":
 		addr = fmt.Sprintf("%s:%d", r.Target.Host, r.Target.Port)
+		u1 := &url.URL{
+			Scheme: "http",
+			Host:   addr,
+			Path:   r.Target.Path,
+		}
+		u = httputil.NewSingleHostReverseProxy(u1)
 	default:
 		fmt.Printf("invalid scheme: %s, only support unix, http", r.Target.Type)
 		os.Exit(-1)
 	}
-	u = newProxy(addr, r.URLPrefix)
 	p := strings.TrimRight(r.URLPrefix, "/")
 	router.PathPrefix(r.URLPrefix).Handler(
 		http.StripPrefix(p, u))

@@ -60,14 +60,15 @@
                         type: unix
                         path: /var/run/php-fpm/www.sock
                 - 
-                    # url start with /proxy/ forward to  http://10.10.1.1
+                    # url start with /proxy/ reverse proxy for http://10.10.1.1/
                     # this act as reverse proxy
                     urlprefix:  /proxy/
-                    type: http
+                    type: reverse
                     target:
                         type: http
                         host: 10.10.1.1
                         port: 8080
+                        path: /
         - &example1
             <<: *example1_www
             hostname: example1.com
