@@ -56,7 +56,7 @@ func (f *FastCGI) FastCGIPass(w http.ResponseWriter, r *http.Request) {
 
 	defer conn.Close()
 
-	client := gofast.NewClient(conn, 20)
+	client := gofast.NewClient("", conn, 20)
 
 	urlPath := r.URL.Path
 	if f.URLPrefix != "" {
