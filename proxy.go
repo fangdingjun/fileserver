@@ -17,6 +17,7 @@ type proxy struct {
 	addr      string
 	prefix    string
 	dialer    *net.Dialer
+	network   string
 }
 
 func newProxy(addr string, prefix string) *proxy {
@@ -25,22 +26,26 @@ func newProxy(addr string, prefix string) *proxy {
 		prefix: prefix,
 		dialer: &net.Dialer{Timeout: 2 * time.Second},
 	}
+	if addr[0] == '/' {
+		p.network = "unix"
+	} else {
+		p.network = "tcp"
+	}
 	p.transport = &http.Transport{
 		DialContext:     p.dialContext,
 		MaxIdleConns:    5,
 		IdleConnTimeout: 30 * time.Second,
-		//Dial: p.dial,
 	}
 	return p
 }
 
 func (p *proxy) dialContext(ctx context.Context,
 	network, addr string) (net.Conn, error) {
-	return p.dialer.DialContext(ctx, network, p.addr)
+	return p.dialer.DialContext(ctx, p.network, p.addr)
 }
 
 func (p *proxy) dial(network, addr string) (conn net.Conn, err error) {
-	return p.dialer.Dial(network, p.addr)
+	return p.dialer.Dial(p.network, p.addr)
 }
 
 func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
