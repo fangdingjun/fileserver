@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/yookoala/gofast"
+	"github.com/fangdingjun/gofast"
 	"log"
 	"net"
 	"net/http"
@@ -56,7 +56,7 @@ func (f *FastCGI) FastCGIPass(w http.ResponseWriter, r *http.Request) {
 
 	defer conn.Close()
 
-	client := gofast.NewClient("", conn, 20)
+	client := gofast.NewClient(f.DocRoot, conn, 20)
 
 	urlPath := r.URL.Path
 	if f.URLPrefix != "" {
@@ -85,47 +85,19 @@ func (f *FastCGI) FastCGIPass(w http.ResponseWriter, r *http.Request) {
 
 	req := client.NewRequest(r)
 
-	req.Params["DOCUMENT_URI"] = scriptName
+	// set ourself path, prefix stripped
+	// req.Params["DOCUMENT_URI"] = scriptName
 	req.Params["SCRIPT_NAME"] = scriptName
 	req.Params["PHP_SELF"] = scriptName
-	req.Params["DOCUMENT_ROOT"] = f.DocRoot
 	req.Params["PATH_INFO"] = pathInfo
 	req.Params["SCRIPT_FILENAME"] = scriptFileName
 
-	https := "off"
 	scheme := "http"
 	if r.TLS != nil {
-		https = "on"
 		scheme = "https"
 	}
 
 	req.Params["REQUEST_SCHEME"] = scheme
-	req.Params["HTTPS"] = https
-
-	host, port, _ := net.SplitHostPort(r.RemoteAddr)
-	req.Params["REMOTE_ADDR"] = host
-	req.Params["REMOTE_PORT"] = port
-
-	host, port, err = net.SplitHostPort(r.Host)
-	if err != nil {
-		host = r.Host
-		if scheme == "http" {
-			port = "80"
-		} else {
-			port = "443"
-		}
-	}
-	req.Params["SERVER_NAME"] = host
-	req.Params["SERVER_PORT"] = port
-
-	req.Params["SERVER_PROTOCOL"] = r.Proto
-
-	for k, v := range r.Header {
-		k = "HTTP_" + strings.ToUpper(strings.Replace(k, "-", "_", -1))
-		if _, ok := req.Params[k]; ok == false {
-			req.Params[k] = strings.Join(v, ";")
-		}
-	}
 
 	resp, err := client.Do(req)
 	if err != nil {
