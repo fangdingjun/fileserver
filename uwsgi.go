@@ -18,7 +18,13 @@ type Uwsgi struct {
 // NewUwsgi create a new Uwsgi
 func NewUwsgi(network, addr, urlPrefix string) *Uwsgi {
 	u := strings.TrimRight(urlPrefix, "/")
-	return &Uwsgi{&uwsgi.Passenger{network, addr}, u}
+	return &Uwsgi{
+		Passenger: &uwsgi.Passenger{
+			Net:  network,
+			Addr: addr,
+		},
+		URLPrefix: u,
+	}
 }
 
 // ServeHTTP implements http.Handler interface
