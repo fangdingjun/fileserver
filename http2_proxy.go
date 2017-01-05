@@ -24,6 +24,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"sync"
 )
@@ -42,6 +43,11 @@ type handler struct {
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if debug {
+		req, _ := httputil.DumpRequest(r, false)
+		log.Printf("%s", string(req))
+	}
+
 	if r.Method == http.MethodConnect {
 		h.handleConnect(w, r)
 	} else {
@@ -69,6 +75,11 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer resp.Body.Close()
+
+	if debug {
+		d, _ := httputil.DumpResponse(resp, false)
+		log.Printf("%s", string(d))
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		w.WriteHeader(resp.StatusCode)
@@ -110,7 +121,10 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	resp.Header.Del("connection")
+	if debug {
+		d, _ := httputil.DumpResponse(resp, false)
+		log.Printf("%s", string(d))
+	}
 
 	hdr := w.Header()
 	for k, v := range resp.Header {
@@ -136,12 +150,18 @@ func newClientConn(host string, port string, hostname string, t *http2.Transport
 func (p *clientConn) GetClientConn(req *http.Request, addr string) (*http2.ClientConn, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
 	if p.conn != nil {
 		return p.conn, nil
 	}
+
 	config := &tls.Config{
 		ServerName: p.hostname,
 		NextProtos: []string{"h2"},
+	}
+
+	if debug {
+		log.Printf("dial to %s:%s", p.host, p.port)
 	}
 
 	conn, err := tls.Dial("tcp", net.JoinHostPort(p.host, p.port), config)
@@ -149,23 +169,31 @@ func (p *clientConn) GetClientConn(req *http.Request, addr string) (*http2.Clien
 		log.Println(err)
 		return nil, err
 	}
+
 	http2conn, err := p.transport.NewClientConn(conn)
 	if err != nil {
 		conn.Close()
 		log.Println(err)
 		return nil, err
 	}
+
 	p.conn = http2conn
+
 	return http2conn, err
 }
 
 func (p *clientConn) MarkDead(conn *http2.ClientConn) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	log.Println("mark dead")
+
+	if debug {
+		log.Println("mark dead")
+	}
 
 	p.conn = nil
 }
+
+var debug bool
 
 func main() {
 	var addr string
@@ -174,6 +202,7 @@ func main() {
 	flag.StringVar(&addr, "server", "", "server address")
 	flag.StringVar(&hostname, "name", "", "server 's SNI name")
 	flag.StringVar(&listen, "listen", ":8080", "listen address")
+	flag.BoolVar(&debug, "debug", false, "verbose mode")
 	flag.Parse()
 
 	if addr == "" {
@@ -199,8 +228,11 @@ func main() {
 	transport.ConnPool = p
 
 	log.Printf("listen on %s", listen)
-	log.Printf("use parent proxy https://%s:%s/", host, port)
-	log.Printf("server SNI name %s", hostname)
+
+	if debug {
+		log.Printf("use parent proxy https://%s:%s/", host, port)
+		log.Printf("server SNI name %s", hostname)
+	}
 
 	if err := http.ListenAndServe(listen, &handler{transport}); err != nil {
 		log.Fatal(err)
