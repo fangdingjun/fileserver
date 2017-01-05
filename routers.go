@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/fangdingjun/gofast"
 	"github.com/gorilla/mux"
 	"log"
 	"net"
@@ -155,22 +156,24 @@ func registerUwsgiHandler(r rule, router *mux.Router) {
 }
 
 func registerFastCGIHandler(r rule, docroot string, router *mux.Router) {
-	var p string
+	var n, p string
 	switch r.Target.Type {
 	case "unix":
+		n = "unix"
 		p = r.Target.Path
 	case "tcp":
+		n = "tcp"
 		p = fmt.Sprintf("%s:%d", r.Target.Host, r.Target.Port)
 	default:
 		fmt.Printf("invalid scheme: %s, only support unix, tcp", r.Target.Type)
 		os.Exit(-1)
 	}
+
+	u := gofast.NewHandler(gofast.NewPHPFS(docroot), n, p)
 	if r.IsRegex {
 		m1 := myURLMatch{regexp.MustCompile(r.URLPrefix)}
-		u, _ := NewFastCGI(r.Target.Type, p, docroot, "")
 		router.MatcherFunc(m1.match).Handler(u)
 	} else {
-		u, _ := NewFastCGI(r.Target.Type, p, docroot, r.URLPrefix)
 		router.PathPrefix(r.URLPrefix).Handler(u)
 	}
 }
