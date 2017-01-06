@@ -63,7 +63,11 @@ func initRouters(cfg conf) {
 			case "uwsgi":
 				registerUwsgiHandler(rule, router)
 			case "fastcgi":
-				registerFastCGIHandler(rule, l.Docroot, router)
+				docroot := l.Docroot
+				if rule.Docroot != "" {
+					docroot = rule.Docroot
+				}
+				registerFastCGIHandler(rule, docroot, router)
 			case "reverse":
 				registerHTTPHandler(rule, router)
 			default:

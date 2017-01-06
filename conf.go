@@ -27,6 +27,7 @@ type vhost struct {
 type rule struct {
 	URLPrefix string
 	IsRegex   bool
+	Docroot   string
 	Type      string
 	Target    target
 }
