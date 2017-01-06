@@ -17,7 +17,7 @@
     enableproxy: false
     
     # default host's url rule
-    #urlrules:
+    # urlrules:
     #    -
     #        urlprefix: /a
     #        type: alias
@@ -32,99 +32,111 @@
     #            path: /home/user1/a/b/a.txt
 
     # virtual host config
-    vhost: 
-        - &example1_www
-           hostname: www.example1.com
-           docroot: /var/www/html/
-           # cert:
-           # key:
-           
-           # url rule for www.example.com
-           urlrules: 
-                -
-                    # url start with /APIv1/ forward to uwsg socket
-                    urlprefix: /APIv1/
-                    type: uwsgi
-                    target:
-                        type: unix
-                        path: /run/uwsgi/APIv1.sock
-                -
-                    # route php script to fastCGI socket
-                     urlprefix: /phpmyadmin/.*\.php$
-
-                     # set to true means urlprefix is regex expression
-                     isregex: true
-
-                     type: fastcgi
-                     target:
-                        type: unix
-                        path: /var/run/php-fpm/www.sock
-                - 
-                    # url start with /proxy/ reverse proxy for http://10.10.1.1/
-                    # this act as reverse proxy
-                    urlprefix:  /proxy/
-                    type: reverse
-                    target:
-                        type: http
-                        host: 10.10.1.1
-                        port: 8080
-                        path: /
-        - &example1
-            <<: *example1_www
-            hostname: example1.com
-
-        - &example_www
-           hostname: www.example.com
-           docroot: /var/www/example
-           urlrules: 
-              -
-                urlprefix: /APIv2
-                type: uwsgi
-                target:
-                    type: unix
-                    path: /run/uwsgi/APIv2.sock
-        - &example
-           <<: *example_www
-           hostname: example.com
-
-        - &example_bbs
-           hostname: bbs.example.com
-           docroot: /var/www/example_bbs/
-           urlrules: 
-              -
-                 #urlprefix: \.php$|\.php\/.*
-                 #isregex: true
-                 
-                 urlprefix: /
-                 type: fastcgi
-                 target:
-                    type: unix
-                    path: /var/run/php-fpm/www.sock
-
+    # vhost: 
+    #    - &example1_www
+    #       hostname: www.example1.com
+    #       docroot: /var/www/html/
+    #       # cert:
+    #       # key:
+    #       
+    #       # url rule for www.example.com
+    #       urlrules: 
+    #            -
+    #                # url start with /APIv1/ forward to uwsg socket
+    #                urlprefix: /APIv1/
+    #                type: uwsgi
+    #                target:
+    #                    type: unix
+    #                    path: /run/uwsgi/APIv1.sock
+    #            -
+    #                # run php script on /phpmyadmin/ subdirectory
+    #                 urlprefix: /phpmyadmin/
+    #                 type: fastcgi
+    #                 target:
+    #                    type: unix
+    #                    path: /var/run/php-fpm/www.sock
+    #            -
+    #                # pass php to fastcgi socket
+    #                urlprefix: \.php$|\.php/.*
+    #                isregex: true
+    #                type: fastcgi
+    #                target:
+    #                    type: unix
+    #                    path: /var/run/php-fpm/www.sock
+    #            - 
+    #                # run php script on other location
+    #                urlprefix: /a/
+    #                docroot: /home/user/php
+    #                type: fastcgi
+    #                target:
+    #                    type: unix
+    #                    path: /var/run/php-fpm/www.sock
+    #            - 
+    #                # url start with /proxy/ reverse proxy for http://10.10.1.1/
+    #                # this act as reverse proxy
+    #                urlprefix:  /proxy/
+    #                type: reverse
+    #                target:
+    #                    type: http
+    #                    host: 10.10.1.1
+    #                    port: 8080
+    #                    path: /
+    #    - &example1
+    #        <<: *example1_www
+    #        hostname: example1.com
+    #
+    #    - &example_www
+    #       hostname: www.example.com
+    #       docroot: /var/www/example
+    #       urlrules: 
+    #          -
+    #            urlprefix: /APIv2
+    #            type: uwsgi
+    #            target:
+    #                type: unix
+    #                path: /run/uwsgi/APIv2.sock
+    #    - &example
+    #       <<: *example_www
+    #       hostname: example.com
+    #
+    #    - &example_bbs
+    #       hostname: bbs.example.com
+    #       docroot: /var/www/example_bbs/
+    #       urlrules: 
+    #          -
+    #             #urlprefix: \.php$|\.php\/.*
+    #             #isregex: true
+    #             
+    #             urlprefix: /
+    #             type: fastcgi
+    #             target:
+    #                type: unix
+    #                path: /var/run/php-fpm/www.sock
+    #
 # https config
-- 
-    host: 0.0.0.0
-    port: 9002
-    docroot: /srv/www
-    enableproxy: false
-    vhost: 
-        -
-           <<: *example1
-           cert: /home/user1/cert/example1.com.crt
-           key: /home/user1/cert/example1.com.key
-        -
-           <<: *example1_www
-           cert: /home/user1/cert/example1.com.crt
-           key: /home/user1/cert/example1.com.key
-        -
-           <<: *example_www
-           cert: /etc/letsencrypt/live/example.com/fullchain.pem
-           key: /etc/letsencrypt/live/example.com/privkey.pem
-        -
-           <<: *example
-           cert: /etc/letsencrypt/live/example.com/fullchain.pem
-           key: /etc/letsencrypt/live/example.com/privkey.pem
-        -
-           <<: *example_bbs
-           cert: /etc/letsencrypt/live/bbs.example.com/fullchain.pem
-           key: /etc/letsencrypt/live/bbs.example.com/privkey.pem
+#- 
+#    host: 0.0.0.0
+#    port: 9002
+#    docroot: /srv/www
+#    enableproxy: false
+#    vhost: 
+#        -
+#           <<: *example1
+#           cert: /home/user1/cert/example1.com.crt
+#           key: /home/user1/cert/example1.com.key
+#        -
+#           <<: *example1_www
+#           cert: /home/user1/cert/example1.com.crt
+#           key: /home/user1/cert/example1.com.key
+#        -
+#           <<: *example_www
+#           cert: /etc/letsencrypt/live/example.com/fullchain.pem
+#           key: /etc/letsencrypt/live/example.com/privkey.pem
+#        -
+#           <<: *example
+#           cert: /etc/letsencrypt/live/example.com/fullchain.pem
+#           key: /etc/letsencrypt/live/example.com/privkey.pem
+#        -
+#           <<: *example_bbs
+#           cert: /etc/letsencrypt/live/bbs.example.com/fullchain.pem
+#           key: /etc/letsencrypt/live/bbs.example.com/privkey.pem
