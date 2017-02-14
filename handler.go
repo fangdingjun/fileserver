@@ -200,6 +200,9 @@ func (h *handler) isLocalRequest(r *http.Request) bool {
 }
 
 func pipeAndClose(r1, r2 io.ReadWriteCloser) {
+	defer r1.Close()
+	defer r2.Close()
+
 	ch := make(chan int, 2)
 	go func() {
 		io.Copy(r1, r2)
