@@ -19,11 +19,12 @@ type handler struct {
 }
 
 var defaultTransport http.RoundTripper = &http.Transport{
-	DialContext:         dialContext,
-	MaxIdleConns:        50,
-	IdleConnTimeout:     30 * time.Second,
-	MaxIdleConnsPerHost: 3,
-	//ResponseHeaderTimeout: 2 * time.Second,
+	//DialContext:         dialContext,
+	MaxIdleConns:          50,
+	IdleConnTimeout:       30 * time.Second,
+	MaxIdleConnsPerHost:   3,
+	DisableKeepAlives:     true,
+	ResponseHeaderTimeout: 2 * time.Second,
 }
 
 // ServeHTTP implements the http.Handler interface
@@ -132,7 +133,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	var conn net.Conn
 	var err error
 
-	conn, err = dial("tcp", host)
+	conn, err = net.Dial("tcp", host)
 	if err != nil {
 		log.Printf("net.dial: %s", err)
 		w.Header().Set("Content-Type", "text/plain")
