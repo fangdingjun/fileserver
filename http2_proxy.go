@@ -88,7 +88,7 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.transport.RoundTrip(r)
 	if err != nil {
-		log.Println(err)
+		log.Printf("roundtrip: %s", err)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "%s", err)
 		return
@@ -108,6 +108,7 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	c, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
+		log.Println("hijack: %s", err)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "%s", err)
 		return
@@ -171,7 +172,7 @@ func (p *clientConn) GetClientConn(req *http.Request, addr string) (*http2.Clien
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if p.conn != nil {
+	if p.conn != nil && p.conn.CanTakeNewRequest() {
 		return p.conn, nil
 	}
 
@@ -211,14 +212,14 @@ func (p *clientConn) GetClientConn(req *http.Request, addr string) (*http2.Clien
 }
 
 func (p *clientConn) MarkDead(conn *http2.ClientConn) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	//p.lock.Lock()
+	//defer p.lock.Unlock()
 
 	if debug {
 		log.Println("mark dead")
 	}
 
-	p.conn = nil
+	//p.conn = nil
 }
 
 var debug bool
