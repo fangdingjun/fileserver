@@ -13,6 +13,9 @@ type server struct {
 	Docroot     string
 	URLRules    []rule
 	EnableProxy bool
+	EnableAuth  bool
+	PasswdFile  string
+	Realm       string
 	Vhost       []vhost
 }
 

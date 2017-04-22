@@ -14,7 +14,10 @@
     # default document root
     docroot: /srv/www
 
-    enableproxy: false
+    enableproxy: true
+    enableauth: true
+    passwdfile: ./passwdfile
+    realm:  example.com
     
     # default host's url rule
     # urlrules:

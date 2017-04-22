@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	auth "github.com/abbot/go-http-auth"
 	"io"
 	"log"
 	"net"
@@ -15,6 +16,8 @@ import (
 type handler struct {
 	handler      http.Handler
 	enableProxy  bool
+	enableAuth   bool
+	authMethod   *auth.DigestAuth
 	localDomains []string
 }
 
@@ -55,6 +58,14 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
 		return
+	}
+
+	if h.enableAuth {
+		u, _ := h.authMethod.CheckAuth(r)
+		if u == "" {
+			h.authMethod.RequireAuth(w, r)
+			return
+		}
 	}
 
 	if r.Method == http.MethodConnect {

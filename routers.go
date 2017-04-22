@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	auth "github.com/abbot/go-http-auth"
 	"github.com/fangdingjun/gofast"
 	"github.com/gorilla/mux"
 	"log"
@@ -82,8 +83,23 @@ func initRouters(cfg conf) {
 			hdlr := &handler{
 				handler:      router,
 				enableProxy:  l.EnableProxy,
+				enableAuth:   l.EnableAuth,
 				localDomains: domains,
 			}
+
+			if l.EnableAuth {
+				if l.PasswdFile == "" {
+					log.Fatal("passwdfile required")
+				}
+				du, err := newDigestSecret(l.PasswdFile)
+				if err != nil {
+					log.Fatal(err)
+				}
+				digestAuth := auth.NewDigestAuthenticator(l.Realm, du.getPw)
+				digestAuth.Headers = auth.ProxyHeaders
+				hdlr.authMethod = digestAuth
+			}
+
 			if len(certs) > 0 {
 				tlsconfig := &tls.Config{
 					Certificates: certs,
