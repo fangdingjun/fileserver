@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	auth "github.com/abbot/go-http-auth"
+	auth "github.com/fangdingjun/go-http-auth"
 	"github.com/fangdingjun/gofast"
 	"github.com/gorilla/mux"
 	"log"

@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	auth "github.com/abbot/go-http-auth"
+	auth "github.com/fangdingjun/go-http-auth"
 	"io"
 	"log"
 	"net"
@@ -83,6 +83,7 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	r.Header.Del("proxy-connection")
+	r.Header.Del("proxy-authorization")
 
 	if r.ProtoMajor == 2 {
 		r.URL.Scheme = "http"
