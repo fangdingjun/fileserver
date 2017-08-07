@@ -167,6 +167,12 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 
 	// HTTP/2.0
 
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("recover %+v", err)
+		}
+	}()
+
 	defer conn.Close()
 
 	w.WriteHeader(http.StatusOK)
@@ -212,6 +218,12 @@ func (h *handler) isLocalRequest(r *http.Request) bool {
 }
 
 func pipeAndClose(r1, r2 io.ReadWriteCloser) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("recover %+v", err)
+		}
+	}()
+
 	defer r1.Close()
 	defer r2.Close()
 
