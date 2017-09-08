@@ -5,7 +5,9 @@ import (
 	"fmt"
 	auth "github.com/fangdingjun/go-http-auth"
 	"github.com/fangdingjun/gofast"
+	loghandler "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -13,11 +15,36 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sync"
 	//"path/filepath"
 	"strings"
 )
 
+type logwriter struct {
+	w io.Writer
+	l *sync.Mutex
+}
+
+func (lw *logwriter) Write(buf []byte) (int, error) {
+	lw.l.Lock()
+	defer lw.l.Unlock()
+	return lw.w.Write(buf)
+}
+
 func initRouters(cfg conf) {
+
+	logout := os.Stdout
+
+	if logfile != "" {
+		fp, err := os.OpenFile(logfile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			log.Println(err)
+		} else {
+			logout = fp
+		}
+	}
+
+	w := &logwriter{logout, new(sync.Mutex)}
 
 	for _, l := range cfg {
 		router := mux.NewRouter()
@@ -110,7 +137,7 @@ func initRouters(cfg conf) {
 				srv := http.Server{
 					Addr:      addr,
 					TLSConfig: tlsconfig,
-					Handler:   hdlr,
+					Handler:   loghandler.CombinedLoggingHandler(w, hdlr),
 				}
 				log.Printf("listen https on %s", addr)
 				if err := srv.ListenAndServeTLS("", ""); err != nil {
@@ -119,7 +146,10 @@ func initRouters(cfg conf) {
 
 			} else {
 				log.Printf("listen http on %s", addr)
-				if err := http.ListenAndServe(addr, hdlr); err != nil {
+				if err := http.ListenAndServe(
+					addr,
+					loghandler.CombinedLoggingHandler(w, hdlr),
+				); err != nil {
 					log.Fatal(err)
 				}
 			}
