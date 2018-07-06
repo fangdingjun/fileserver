@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	auth "github.com/fangdingjun/go-http-auth"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	auth "github.com/fangdingjun/go-http-auth"
 )
 
 // handler process the proxy request first(if enabled)
@@ -121,21 +122,11 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, resp.Body)
 }
 
-type flushWriter struct {
-	w io.Writer
-}
-
-func (fw flushWriter) Write(buf []byte) (int, error) {
-	n, err := fw.w.Write(buf)
-	fw.w.(http.Flusher).Flush()
-	return n, err
-}
-
 func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	host := r.RequestURI
 
 	if r.ProtoMajor == 2 {
-		host = r.URL.Host
+		host = r.Host
 	}
 
 	if !strings.Contains(host, ":") {
@@ -176,7 +167,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	w.WriteHeader(http.StatusOK)
-	w.(http.Flusher).Flush()
+	//w.(http.Flusher).Flush()
 
 	ch := make(chan int, 2)
 	go func() {
@@ -185,7 +176,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	go func() {
-		io.Copy(flushWriter{w}, conn)
+		io.Copy(w, conn)
 		ch <- 1
 	}()
 

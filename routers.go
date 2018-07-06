@@ -1,12 +1,7 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
-	auth "github.com/fangdingjun/go-http-auth"
-	"github.com/fangdingjun/gofast"
-	loghandler "github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net"
@@ -15,9 +10,15 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"sync"
-	//"path/filepath"
 	"strings"
+	"sync"
+
+	"github.com/fangdingjun/gnutls"
+	auth "github.com/fangdingjun/go-http-auth"
+	"github.com/fangdingjun/gofast"
+	nghttp2 "github.com/fangdingjun/nghttp2-go"
+	loghandler "github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 )
 
 type logwriter struct {
@@ -49,7 +50,7 @@ func initRouters(cfg conf) {
 	for _, l := range cfg {
 		router := mux.NewRouter()
 		domains := []string{}
-		certs := []tls.Certificate{}
+		certs := []*gnutls.Certificate{}
 
 		// initial virtual host
 		for _, h := range l.Vhost {
@@ -59,7 +60,7 @@ func initRouters(cfg conf) {
 			}
 			domains = append(domains, h2)
 			if h.Cert != "" && h.Key != "" {
-				if cert, err := tls.LoadX509KeyPair(h.Cert, h.Key); err == nil {
+				if cert, err := gnutls.LoadX509KeyPair(h.Cert, h.Key); err == nil {
 					certs = append(certs, cert)
 				} else {
 					log.Fatal(err)
@@ -128,21 +129,28 @@ func initRouters(cfg conf) {
 			}
 
 			if len(certs) > 0 {
-				tlsconfig := &tls.Config{
+				tlsconfig := &gnutls.Config{
 					Certificates: certs,
+					NextProtos:   []string{"h2", "http/1.1"},
 				}
-
-				tlsconfig.BuildNameToCertificate()
-
-				srv := http.Server{
-					Addr:      addr,
-					TLSConfig: tlsconfig,
-					Handler:   loghandler.CombinedLoggingHandler(w, hdlr),
-				}
-				log.Printf("listen https on %s", addr)
-				if err := srv.ListenAndServeTLS("", ""); err != nil {
+				listener, err := gnutls.Listen("tcp", addr, tlsconfig)
+				if err != nil {
 					log.Fatal(err)
 				}
+
+				handler := loghandler.CombinedLoggingHandler(w, hdlr)
+				log.Printf("listen https on %s", addr)
+				go func() {
+					defer listener.Close()
+					for {
+						conn, err := listener.Accept()
+						if err != nil {
+							log.Println(err)
+							break
+						}
+						go handleHttpClient(conn, handler)
+					}
+				}()
 
 			} else {
 				log.Printf("listen http on %s", addr)
@@ -259,4 +267,29 @@ type myURLMatch struct {
 func (m myURLMatch) match(r *http.Request, route *mux.RouteMatch) bool {
 	ret := m.re.MatchString(r.URL.Path)
 	return ret
+}
+
+func handleHttpClient(c net.Conn, handler http.Handler) {
+	tlsconn := c.(*gnutls.Conn)
+	if err := tlsconn.Handshake(); err != nil {
+		log.Println(err)
+		return
+	}
+	state := tlsconn.ConnectionState()
+	if state.NegotiatedProtocol == "h2" {
+		h2conn, err := nghttp2.NewServerConn(tlsconn, handler)
+		if err != nil {
+			log.Println(err)
+		}
+		h2conn.Run()
+		return
+	}
+	defer c.Close()
+	resp := &http.Response{
+		StatusCode: http.StatusHTTPVersionNotSupported,
+		Status:     http.StatusText(http.StatusHTTPVersionNotSupported),
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+	}
+	resp.Write(tlsconn)
 }
