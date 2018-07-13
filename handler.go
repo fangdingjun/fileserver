@@ -32,7 +32,7 @@ var defaultTransport http.RoundTripper = &http.Transport{
 	IdleConnTimeout:       30 * time.Second,
 	MaxIdleConnsPerHost:   3,
 	DisableKeepAlives:     true,
-	ResponseHeaderTimeout: 2 * time.Second,
+	ResponseHeaderTimeout: 10 * time.Second,
 }
 
 // ServeHTTP implements the http.Handler interface
@@ -100,7 +100,10 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			r.Body = nil
 		}
 	}
-
+	if r.Method == http.MethodPost && r.ContentLength == 0 {
+		r.Body = http.NoBody
+	}
+	//log.Println("content-length", r.Header.Get("content-length"))
 	resp, err = defaultTransport.RoundTrip(r)
 	if err != nil {
 		log.Printf("RoundTrip: %s", err)
@@ -114,9 +117,15 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 	hdr := w.Header()
 
-	resp.Header.Del("connection")
-
 	for k, v := range resp.Header {
+		_k := strings.ToLower(k)
+		if _k == "connection" || _k == "transfer-encoding" ||
+			_k == "keep-alive" || _k == "upgrade" || _k == "te" {
+			continue
+		}
+		if resp.StatusCode == 204 && _k == "content-length" {
+			continue
+		}
 		for _, v1 := range v {
 			hdr.Add(k, v1)
 		}
