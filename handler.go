@@ -160,7 +160,12 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 
 	if r.ProtoMajor == 1 {
 		// HTTP/1.1
-		hj, _ := w.(http.Hijacker)
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
 		conn1, _, _ := hj.Hijack()
 
 		fmt.Fprintf(conn1, "%s 200 connection established\r\n\r\n", r.Proto)
