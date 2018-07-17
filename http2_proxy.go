@@ -54,14 +54,14 @@ func (tc *timeoutConn) Write(b []byte) (n int, err error) {
 }
 
 type handler struct {
-	h2conn   *nghttp2.ClientConn
+	h2conn   *nghttp2.Conn
 	addr     string
 	hostname string
 	insecure bool
 	lock     *sync.Mutex
 }
 
-func (h *handler) createConnection() (*nghttp2.ClientConn, error) {
+func (h *handler) createConnection() (*nghttp2.Conn, error) {
 	log.Println("create connection to ", h.addr)
 	c, err := net.DialTimeout("tcp", h.addr, 5*time.Second)
 	if err != nil {
@@ -87,7 +87,7 @@ func (h *handler) createConnection() (*nghttp2.ClientConn, error) {
 	return client, nil
 }
 
-func (h *handler) getConn() (*nghttp2.ClientConn, error) {
+func (h *handler) getConn() (*nghttp2.Conn, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -134,11 +134,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 	var err error
-	var h2conn *nghttp2.ClientConn
+	var h2conn *nghttp2.Conn
 	var code int
 	//var resp *http.Response
 
-	var cs *nghttp2.ClientStream
+	var cs net.Conn
 
 	for i := 0; i < 2; i++ {
 		h2conn, err = h.getConn()
@@ -163,6 +163,7 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	defer cs.Close()
 	if code != http.StatusOK {
+		log.Println("code", code)
 		w.WriteHeader(code)
 		return
 	}
@@ -196,7 +197,7 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var resp *http.Response
-	var h2conn *nghttp2.ClientConn
+	var h2conn *nghttp2.Conn
 
 	if r.RequestURI[0] == '/' {
 		http.DefaultServeMux.ServeHTTP(w, r)
@@ -210,7 +211,7 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
-		resp, err = h2conn.CreateRequest(r)
+		resp, err = h2conn.RoundTrip(r)
 		if resp != nil {
 			break
 		}
