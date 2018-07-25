@@ -263,6 +263,7 @@ func handleHTTPClient(c net.Conn, handler http.Handler) {
 			log.Println(err)
 		}
 		h2conn.Run()
+		h2conn = nil
 		return
 	}
 
@@ -284,6 +285,9 @@ func handleHTTPClient(c net.Conn, handler http.Handler) {
 		handler.ServeHTTP(rh, req)
 		rh.Write(nil)
 		rh.buf.WriteTo(rh.c)
+		if req.Body != nil {
+			req.Body.Close()
+		}
 	}
 }
 
