@@ -7,15 +7,19 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	//_ "net/http/pprof"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
 
-	"github.com/fangdingjun/gnutls"
+	"crypto/tls"
+	//"github.com/fangdingjun/gnutls"
+
 	auth "github.com/fangdingjun/go-http-auth"
 	"github.com/fangdingjun/gofast"
+	"github.com/fangdingjun/nghttp2-go"
 	loghandler "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -48,7 +52,7 @@ func initRouters(cfg conf) {
 	for _, l := range cfg {
 		router := mux.NewRouter()
 		domains := []string{}
-		certs := []*gnutls.Certificate{}
+		certs := []tls.Certificate{}
 
 		// initial virtual host
 		for _, h := range l.Vhost {
@@ -58,7 +62,7 @@ func initRouters(cfg conf) {
 			}
 			domains = append(domains, h2)
 			if h.Cert != "" && h.Key != "" {
-				if cert, err := gnutls.LoadX509KeyPair(h.Cert, h.Key); err == nil {
+				if cert, err := tls.LoadX509KeyPair(h.Cert, h.Key); err == nil {
 					certs = append(certs, cert)
 				} else {
 					log.Fatal(err)
@@ -101,7 +105,7 @@ func initRouters(cfg conf) {
 				fmt.Printf("invalid type: %s\n", rule.Type)
 			}
 		}
-
+		//router.PathPrefix("/debug/").Handler(http.DefaultServeMux)
 		router.PathPrefix("/").Handler(http.FileServer(http.Dir(l.Docroot)))
 
 		go func(l server) {
@@ -127,30 +131,24 @@ func initRouters(cfg conf) {
 			}
 
 			if len(certs) > 0 {
-				tlsconfig := &gnutls.Config{
+				tlsconfig := &tls.Config{
 					Certificates: certs,
 					NextProtos:   []string{"h2", "http/1.1"},
 				}
-				listener, err := gnutls.Listen("tcp", addr, tlsconfig)
-				if err != nil {
-					log.Fatal(err)
-				}
-
 				handler := loghandler.CombinedLoggingHandler(w, hdlr)
 				//handler := hdlr
 				log.Printf("listen https on %s", addr)
-				go func() {
-					defer listener.Close()
-					for {
-						conn, err := listener.Accept()
-						if err != nil {
-							log.Println(err)
-							break
-						}
-						go handleHTTPClient(conn, handler)
-					}
-				}()
-
+				srv := &http.Server{
+					Addr:      addr,
+					Handler:   handler,
+					TLSConfig: tlsconfig,
+					TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){
+						"h2": nghttp2.HTTP2Handler,
+					},
+				}
+				if err := srv.ListenAndServeTLS("", ""); err != nil {
+					log.Fatal(err)
+				}
 			} else {
 				log.Printf("listen http on %s", addr)
 				handler := loghandler.CombinedLoggingHandler(w, hdlr)

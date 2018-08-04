@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -11,9 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fangdingjun/gnutls"
 	auth "github.com/fangdingjun/go-http-auth"
-	nghttp2 "github.com/fangdingjun/nghttp2-go"
 )
 
 // handler process the proxy request first(if enabled)
@@ -248,108 +244,4 @@ func pipeAndClose(r1, r2 io.ReadWriteCloser) {
 	}()
 
 	<-ch
-}
-
-func handleHTTPClient(c net.Conn, handler http.Handler) {
-	tlsconn := c.(*gnutls.Conn)
-	if err := tlsconn.Handshake(); err != nil {
-		log.Println(err)
-		return
-	}
-	state := tlsconn.ConnectionState()
-	if state.NegotiatedProtocol == "h2" {
-		h2conn, err := nghttp2.Server(tlsconn, handler)
-		if err != nil {
-			log.Println(err)
-		}
-		h2conn.Run()
-		h2conn = nil
-		return
-	}
-
-	defer c.Close()
-	r := bufio.NewReader(tlsconn)
-	buf := new(bytes.Buffer)
-	for {
-		req, err := http.ReadRequest(r)
-		if err != nil {
-			return
-		}
-		addr := tlsconn.RemoteAddr().String()
-		req.RemoteAddr = addr
-		rh := &responseHandler{
-			c:      tlsconn,
-			header: http.Header{},
-			buf:    buf,
-		}
-		handler.ServeHTTP(rh, req)
-		rh.Write(nil)
-		rh.buf.WriteTo(rh.c)
-		if req.Body != nil {
-			req.Body.Close()
-		}
-	}
-}
-
-type responseHandler struct {
-	c            net.Conn
-	statusCode   int
-	header       http.Header
-	responseSend bool
-	w            io.Writer
-	buf          *bytes.Buffer
-}
-
-func (r *responseHandler) WriteHeader(statusCode int) {
-	if r.responseSend {
-		return
-	}
-	r.buf.Reset()
-	r.statusCode = statusCode
-	cl := r.header.Get("content-length")
-	te := r.header.Get("transfer-encoding")
-	if cl == "" || te != "" {
-		if te == "" {
-			r.header.Set("transfer-encoding", "chunked")
-		}
-		r.w = &chunkWriter{r.buf}
-	} else {
-		r.w = r.buf
-	}
-	fmt.Fprintf(r.buf, "HTTP/1.1 %d %s\r\n", statusCode,
-		http.StatusText(statusCode))
-	for k, v := range r.header {
-		fmt.Fprintf(r.buf, "%s: %s\r\n", strings.Title(k), strings.Join(v, ","))
-	}
-	fmt.Fprintf(r.buf, "\r\n")
-	r.responseSend = true
-}
-
-func (r *responseHandler) Header() http.Header {
-	return r.header
-}
-
-func (r *responseHandler) Write(buf []byte) (int, error) {
-	if !r.responseSend {
-		r.WriteHeader(http.StatusOK)
-	}
-	n, err := r.w.Write(buf)
-	if r.buf.Len() > 2048 {
-		r.buf.WriteTo(r.c)
-	}
-	return n, err
-}
-
-var _ http.ResponseWriter = &responseHandler{}
-
-type chunkWriter struct {
-	w io.Writer
-}
-
-func (cw *chunkWriter) Write(buf []byte) (int, error) {
-	n := len(buf)
-	if n == 0 {
-		return fmt.Fprintf(cw.w, "0\r\n\r\n")
-	}
-	return fmt.Fprintf(cw.w, "%x\r\n%s\r\n", n, string(buf))
 }
