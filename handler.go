@@ -2,23 +2,20 @@ package main
 
 import (
 	"fmt"
-	auth "github.com/fangdingjun/go-http-auth"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/fangdingjun/go-log"
 )
 
 // handler process the proxy request first(if enabled)
 // and route the request to the registered http.Handler
 type handler struct {
-	handler      http.Handler
-	enableProxy  bool
-	enableAuth   bool
-	authMethod   *auth.DigestAuth
-	localDomains []string
+	handler http.Handler
+	cfg     *conf
 }
 
 var defaultTransport http.RoundTripper = &http.Transport{
@@ -54,18 +51,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// proxy request
 
-	if !h.enableProxy {
+	if r.ProtoMajor == 1 && !h.cfg.Proxy.HTTP1Proxy {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
 		return
 	}
 
-	if h.enableAuth {
-		u, _ := h.authMethod.CheckAuth(r)
-		if u == "" {
-			h.authMethod.RequireAuth(w, r)
-			return
-		}
+	if r.ProtoMajor == 2 && !h.cfg.Proxy.HTTP2Proxy {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
+		return
 	}
 
 	if r.Method == http.MethodConnect {
@@ -178,15 +173,15 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.(http.Flusher).Flush()
 
-	ch := make(chan int, 2)
+	ch := make(chan struct{}, 2)
 	go func() {
 		io.Copy(conn, r.Body)
-		ch <- 1
+		ch <- struct{}{}
 	}()
 
 	go func() {
 		io.Copy(flushWriter{w}, conn)
-		ch <- 1
+		ch <- struct{}{}
 	}()
 
 	<-ch
@@ -195,11 +190,11 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 // isLocalRequest determine the http2 request is local path request
 // or the proxy request
 func (h *handler) isLocalRequest(r *http.Request) bool {
-	if !h.enableProxy {
+	if !h.cfg.Proxy.HTTP2Proxy {
 		return true
 	}
 
-	if len(h.localDomains) == 0 {
+	if len(h.cfg.Proxy.LocalDomains) == 0 {
 		return true
 	}
 
@@ -208,7 +203,7 @@ func (h *handler) isLocalRequest(r *http.Request) bool {
 		host = h1
 	}
 
-	for _, s := range h.localDomains {
+	for _, s := range h.cfg.Proxy.LocalDomains {
 		if strings.HasSuffix(host, s) {
 			return true
 		}
@@ -227,15 +222,15 @@ func pipeAndClose(r1, r2 io.ReadWriteCloser) {
 	defer r1.Close()
 	defer r2.Close()
 
-	ch := make(chan int, 2)
+	ch := make(chan struct{}, 2)
 	go func() {
 		io.Copy(r1, r2)
-		ch <- 1
+		ch <- struct{}{}
 	}()
 
 	go func() {
 		io.Copy(r2, r1)
-		ch <- 1
+		ch <- struct{}{}
 	}()
 
 	<-ch

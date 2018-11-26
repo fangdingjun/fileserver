@@ -1,48 +1,41 @@
 package main
 
 import (
-	"github.com/go-yaml/yaml"
 	"io/ioutil"
+
+	"github.com/go-yaml/yaml"
 )
 
-type conf []server
+type conf struct {
+	Listens []listen `yaml:"listen"`
+	Vhosts  []vhost  `yaml:"vhost"`
+	Proxy   proxycfg `yaml:"proxy"`
+}
 
-type server struct {
-	Host        string
-	Port        int
-	Docroot     string
-	URLRules    []rule
-	EnableProxy bool
-	EnableAuth  bool
-	PasswdFile  string
-	Realm       string
-	Vhost       []vhost
+type proxycfg struct {
+	HTTP1Proxy   bool     `yaml:"http1-proxy"`
+	HTTP2Proxy   bool     `yaml:"http2-proxy"`
+	LocalDomains []string `yaml:"localdomains"`
+}
+
+type listen struct {
+	Addr         string        `yaml:"addr"`
+	Port         int16         `yaml:"port"`
+	Certificates []certificate `yaml:"certificates"`
+}
+
+type certificate struct {
+	CertFile string `yaml:"certfile"`
+	KeyFile  string `yaml:"keyfile"`
 }
 
 type vhost struct {
-	Docroot  string
-	Hostname string
-	Cert     string
-	Key      string
-	URLRules []rule
+	Docroot   string `yaml:"docroot"`
+	Hostname  string `yaml:"hostname"`
+	ProxyPass string `yaml:"proxypass"`
 }
 
-type rule struct {
-	URLPrefix string
-	IsRegex   bool
-	Docroot   string
-	Type      string
-	Target    target
-}
-
-type target struct {
-	Type string
-	Host string
-	Port int
-	Path string
-}
-
-func loadConfig(fn string) (conf, error) {
+func loadConfig(fn string) (*conf, error) {
 	data, err := ioutil.ReadFile(fn)
 	if err != nil {
 		return nil, err
@@ -53,5 +46,5 @@ func loadConfig(fn string) (conf, error) {
 		return nil, err
 	}
 
-	return c, nil
+	return &c, nil
 }

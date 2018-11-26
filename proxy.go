@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
-	//"bufio"
-	//"fmt"
-	"io"
-	"log"
-	//"strings"
 	"time"
+
+	"github.com/fangdingjun/go-log"
 )
 
 type proxy struct {
