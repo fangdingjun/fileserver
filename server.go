@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/http2"
+	"golang.org/x/net/trace"
 )
 
 func initServer(c *conf) error {
@@ -24,6 +25,8 @@ func initServer(c *conf) error {
 		subroute := mux.Host(vh.Hostname)
 		subroute.PathPrefix("/").Handler(http.FileServer(http.Dir(vh.Docroot)))
 	}
+
+	mux.PathPrefix("/debug/").Handler(http.DefaultServeMux)
 
 	if len(c.Vhosts) > 0 {
 		mux.PathPrefix("/").Handler(http.FileServer(http.Dir(c.Vhosts[0].Docroot)))
@@ -47,7 +50,11 @@ func initServer(c *conf) error {
 
 		var h http.Handler
 
-		h = &handler{handler: mux, cfg: c}
+		h = &handler{
+			handler: mux,
+			cfg:     c,
+			events:  trace.NewEventLog("http", fmt.Sprintf("%s:%d", _l.Addr, _l.Port)),
+		}
 		h = handlers.CombinedLoggingHandler(&logout{}, h)
 
 		srv := &http.Server{
@@ -130,6 +137,10 @@ func main() {
 	err = initServer(c)
 	if err != nil {
 		log.Fatalln(err)
+	}
+
+	trace.AuthRequest = func(r *http.Request) (bool, bool) {
+		return true, true
 	}
 
 	ch := make(chan os.Signal, 2)

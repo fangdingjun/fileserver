@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fangdingjun/go-log"
+	"golang.org/x/net/trace"
 )
 
 // handler process the proxy request first(if enabled)
@@ -16,6 +17,7 @@ import (
 type handler struct {
 	handler http.Handler
 	cfg     *conf
+	events  trace.EventLog
 }
 
 var defaultTransport http.RoundTripper = &http.Transport{
@@ -31,6 +33,7 @@ var defaultTransport http.RoundTripper = &http.Transport{
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// http/1.1 local request
 	if r.ProtoMajor == 1 && r.RequestURI[0] == '/' {
+		h.events.Printf("http11 local request %s", r.URL.Path)
 		if h.handler != nil {
 			h.handler.ServeHTTP(w, r)
 		} else {
@@ -41,6 +44,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// http/2.0 local request
 	if r.ProtoMajor == 2 && h.isLocalRequest(r) {
+		h.events.Printf("http2 local request %s", r.URL.Path)
 		if h.handler != nil {
 			h.handler.ServeHTTP(w, r)
 		} else {
@@ -52,12 +56,14 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// proxy request
 
 	if r.ProtoMajor == 1 && !h.cfg.Proxy.HTTP1Proxy {
+		h.events.Errorf("http1.1 request not exists path %s", r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
 		return
 	}
 
 	if r.ProtoMajor == 2 && !h.cfg.Proxy.HTTP2Proxy {
+		h.events.Errorf("http2 request not exists path %s", r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
 		return
@@ -91,8 +97,11 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.events.Printf("%s proxy request %s", r.Proto, r.RequestURI)
+
 	resp, err = defaultTransport.RoundTrip(r)
 	if err != nil {
+		h.events.Errorf("roundtrip %s, error %s", r.RequestURI, err)
 		log.Printf("RoundTrip: %s", err)
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -132,7 +141,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	if r.ProtoMajor == 2 {
 		host = r.URL.Host
 	}
-
+	h.events.Printf("proxy request %s %s", r.Method, host)
 	if !strings.Contains(host, ":") {
 		host = fmt.Sprintf("%s:443", host)
 	}
@@ -142,6 +151,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 
 	conn, err = net.Dial("tcp", host)
 	if err != nil {
+		h.events.Errorf("dial %s, error %s", host, err)
 		log.Printf("net.dial: %s", err)
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -164,6 +174,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if err := recover(); err != nil {
+			h.events.Errorf("http2 data pipe, panic %s", err)
 			log.Printf("recover %+v", err)
 		}
 	}()
@@ -173,6 +184,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.(http.Flusher).Flush()
 
+	//h.events.Printf("data forward")
 	ch := make(chan struct{}, 2)
 	go func() {
 		io.Copy(conn, r.Body)
@@ -213,9 +225,14 @@ func (h *handler) isLocalRequest(r *http.Request) bool {
 }
 
 func pipeAndClose(r1, r2 io.ReadWriteCloser) {
+	tr := trace.New("proxy", "data pipe")
+	defer tr.Finish()
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("recover %+v", err)
+			tr.LazyPrintf("http 1.1 data pipe, recover %+v", err)
+			tr.SetError()
 		}
 	}()
 
