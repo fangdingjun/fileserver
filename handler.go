@@ -102,7 +102,7 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	resp, err = defaultTransport.RoundTrip(r)
 	if err != nil {
 		h.events.Errorf("roundtrip %s, error %s", r.RequestURI, err)
-		log.Printf("RoundTrip: %s", err)
+		log.Errorf("RoundTrip: %s", err)
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "%s", err)
@@ -152,7 +152,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	conn, err = net.Dial("tcp", host)
 	if err != nil {
 		h.events.Errorf("dial %s, error %s", host, err)
-		log.Printf("net.dial: %s", err)
+		log.Errorf("net.dial: %s", err)
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "dial to %s failed: %s", host, err)
@@ -175,7 +175,7 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err := recover(); err != nil {
 			h.events.Errorf("http2 data pipe, panic %s", err)
-			log.Printf("recover %+v", err)
+			log.Errorf("recover %+v", err)
 		}
 	}()
 
@@ -230,7 +230,7 @@ func pipeAndClose(r1, r2 io.ReadWriteCloser) {
 
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("recover %+v", err)
+			log.Errorf("recover %+v", err)
 			tr.LazyPrintf("http 1.1 data pipe, recover %+v", err)
 			tr.SetError()
 		}
