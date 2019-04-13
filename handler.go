@@ -57,15 +57,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.ProtoMajor == 1 && !h.cfg.Proxy.HTTP1Proxy {
 		h.events.Errorf("http1.1 request not exists path %s", r.URL.Path)
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
+		http.Error(w, "<h1>404 Not Found</h1>", http.StatusNotFound)
 		return
 	}
 
 	if r.ProtoMajor == 2 && !h.cfg.Proxy.HTTP2Proxy {
 		h.events.Errorf("http2 request not exists path %s", r.URL.Path)
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "<h1>404 Not Found</h1>")
+		http.Error(w, "<h1>404 Not Found</h1>", http.StatusNotFound)
 		return
 	}
 
@@ -103,9 +101,7 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.events.Errorf("roundtrip %s, error %s", r.RequestURI, err)
 		log.Errorf("RoundTrip: %s", err)
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "%s", err)
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 
@@ -153,9 +149,8 @@ func (h *handler) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.events.Errorf("dial %s, error %s", host, err)
 		log.Errorf("net.dial: %s", err)
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "dial to %s failed: %s", host, err)
+		msg := fmt.Sprintf("dial to %s failed: %s", host, err)
+		http.Error(w, msg, http.StatusServiceUnavailable)
 		return
 	}
 
