@@ -239,9 +239,11 @@ func (p *clientConn) MarkDead(conn *http2.ClientConn) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	log.Errorln("mark dead")
-	p.conn.Close()
-	p.conn = nil
+	if p.conn != nil {
+		log.Errorln("mark dead")
+		p.conn.Close()
+		p.conn = nil
+	}
 }
 
 var debug bool
