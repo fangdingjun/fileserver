@@ -7,26 +7,26 @@ import (
 	proxyproto "github.com/pires/go-proxyproto"
 )
 
-type listener struct {
+type protoListener struct {
 	net.Listener
 }
 
-type conn struct {
+type protoConn struct {
 	net.Conn
 	headerDone bool
 	r          *bufio.Reader
 	proxy      *proxyproto.Header
 }
 
-func (l *listener) Accept() (net.Conn, error) {
+func (l *protoListener) Accept() (net.Conn, error) {
 	c, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	return &conn{Conn: c}, err
+	return &protoConn{Conn: c}, err
 }
 
-func (c *conn) Read(buf []byte) (int, error) {
+func (c *protoConn) Read(buf []byte) (int, error) {
 	var err error
 	if !c.headerDone {
 		c.r = bufio.NewReader(c.Conn)
@@ -40,7 +40,7 @@ func (c *conn) Read(buf []byte) (int, error) {
 	return c.r.Read(buf)
 }
 
-func (c *conn) RemoteAddr() net.Addr {
+func (c *protoConn) RemoteAddr() net.Addr {
 	if c.proxy == nil {
 		return c.Conn.RemoteAddr()
 	}

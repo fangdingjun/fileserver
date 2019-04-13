@@ -69,7 +69,7 @@ func initServer(c *conf) error {
 			return err
 		}
 
-		l = &listener{Listener: l}
+		l = &protoListener{Listener: l}
 
 		if len(certs) > 0 {
 			tlsconfig.Certificates = certs
