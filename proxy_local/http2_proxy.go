@@ -13,6 +13,7 @@ usage example
 */
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -157,12 +158,33 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func newClientConn(host string, port string, hostname string, t *http2.Transport) *clientConn {
-	return &clientConn{
+	cc := &clientConn{
 		host:      host,
 		port:      port,
 		hostname:  hostname,
 		transport: t,
 		lock:      new(sync.Mutex),
+	}
+	go cc.ping()
+	return cc
+}
+
+func (p *clientConn) ping() {
+	for {
+		select {
+		case <-time.After(time.Duration(idleTimeout-5) * time.Second):
+		}
+
+		p.lock.Lock()
+		conn := p.conn
+		p.lock.Unlock()
+
+		if conn == nil {
+			continue
+		}
+		if err := conn.Ping(context.Background()); err != nil {
+			p.MarkDead(conn)
+		}
 	}
 }
 
@@ -187,8 +209,8 @@ func (p *clientConn) GetClientConn(req *http.Request, addr string) (*http2.Clien
 		return nil, err
 	}
 
-	// cc := &timeoutConn{c, time.Duration(idleTimeout) * time.Second}
-	cc := c
+	cc := &timeoutConn{c, time.Duration(idleTimeout) * time.Second}
+	// cc := c
 	config := &tls.Config{
 		ServerName:         p.hostname,
 		NextProtos:         []string{"h2"},
@@ -235,12 +257,16 @@ func main() {
 	flag.StringVar(&listen, "listen", ":8080", "listen address")
 	flag.BoolVar(&debug, "debug", false, "verbose mode")
 	flag.BoolVar(&insecure, "insecure", false, "insecure mode, not verify the server's certificate")
-	flag.IntVar(&idleTimeout, "idletime", 600, "idle timeout, close connection when no data transfer")
+	flag.IntVar(&idleTimeout, "idletime", 20, "idle timeout, close connection when no data transfer")
 	flag.Parse()
 
 	if addr == "" {
 		fmt.Println("please specify the server address")
 		os.Exit(-1)
+	}
+
+	if idleTimeout < 10 {
+		idleTimeout = 10
 	}
 
 	if debug {
