@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/fangdingjun/go-log v4.0.0+incompatible
+	github.com/fangdingjun/protolistener v0.0.0-20190413090244-355464816fc0
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.1

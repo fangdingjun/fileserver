@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/fangdingjun/go-log"
+	"github.com/fangdingjun/protolistener"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/http2"
@@ -69,7 +70,7 @@ func initServer(c *conf) error {
 			return err
 		}
 
-		l = &protoListener{Listener: l}
+		l = protolistener.New(l)
 
 		if len(certs) > 0 {
 			tlsconfig.Certificates = certs
