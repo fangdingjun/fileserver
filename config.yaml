@@ -6,20 +6,13 @@ listen:
     addr: 0.0.0.0
     port: 9001
     certificates:
-  -
-    addr: 0.0.0.0
-    port: 9002
-    certificates:
-      -
-        certfile: /etc/letsencrypt/live/ratafee.nl/fullchain.pem
-        keyfile: /etc/letsencrypt/live/ratafee.nl/privkey.pem
 
 # virtual host support
 vhost:
   -
     hostname: www.ratafee.nl
-    docroot: /srv/www
-    proxypass: http://nginx:80/
+    docroot: .
+    # proxypass: http://nginx:80/
     url_rules:
        -  prefix: /api/
           lua_file: api.lua

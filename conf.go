@@ -33,6 +33,10 @@ type vhost struct {
 	Docroot   string `yaml:"docroot"`
 	Hostname  string `yaml:"hostname"`
 	ProxyPass string `yaml:"proxypass"`
+	URLRules  []struct {
+		Prefix  string `yaml:"prefix"`
+		LuaFile string `yaml:"lua_file"`
+	} `yaml:"url_rules"`
 }
 
 func loadConfig(fn string) (*conf, error) {

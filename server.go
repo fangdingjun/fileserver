@@ -24,12 +24,19 @@ func initServer(c *conf) error {
 
 	for _, vh := range c.Vhosts {
 		subroute := mux.Host(vh.Hostname)
+		for _, rule := range vh.URLRules {
+			subroute.PathPrefix(rule.Prefix).Handler(&luaHandler{rule.LuaFile})
+		}
 		subroute.PathPrefix("/").Handler(http.FileServer(http.Dir(vh.Docroot)))
 	}
 
 	mux.PathPrefix("/debug/").Handler(http.DefaultServeMux)
 
 	if len(c.Vhosts) > 0 {
+		rules := c.Vhosts[0].URLRules
+		for _, rule := range rules {
+			mux.PathPrefix(rule.Prefix).Handler(&luaHandler{rule.LuaFile})
+		}
 		mux.PathPrefix("/").Handler(http.FileServer(http.Dir(c.Vhosts[0].Docroot)))
 	} else {
 		mux.PathPrefix("/").Handler(http.FileServer(http.Dir("/var/www/html")))
