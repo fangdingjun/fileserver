@@ -104,6 +104,7 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(resp.StatusCode)
 		io.Copy(w, resp.Body)
 		resp.Body.Close()
+		log.Infof("%s %s %d %s %s", r.Method, r.RequestURI, resp.StatusCode, r.Proto, r.UserAgent())
 		return
 	}
 
@@ -111,6 +112,7 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf("hijack: %s", err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		log.Infof("%s %s %d %s %s", r.Method, r.RequestURI, 500, r.Proto, r.UserAgent())
 		return
 	}
 
@@ -130,6 +132,7 @@ func (h *handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	<-ch
+	log.Infof("%s %s %d %s %s", r.Method, r.RequestURI, 200, r.Proto, r.UserAgent())
 }
 
 func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +157,8 @@ func (h *handler) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	n, _ := io.Copy(w, resp.Body)
+	log.Infof("%s %s %d %s %d %s", r.Method, r.RequestURI, resp.StatusCode, r.Proto, n, r.UserAgent())
 }
 
 func newClientConn(host string, port string, hostname string, t *http2.Transport) *clientConn {
@@ -254,12 +258,15 @@ func main() {
 	var addr string
 	var hostname string
 	var listen string
+	var logfile string
+
 	flag.StringVar(&addr, "server", "", "server address")
 	flag.StringVar(&hostname, "name", "", "server 's SNI name")
 	flag.StringVar(&listen, "listen", ":8080", "listen address")
 	flag.BoolVar(&debug, "debug", false, "verbose mode")
 	flag.BoolVar(&insecure, "insecure", false, "insecure mode, not verify the server's certificate")
 	flag.IntVar(&idleTimeout, "idletime", 20, "idle timeout, close connection when no data transfer")
+	flag.StringVar(&logfile, "log_file", "", "log file")
 	flag.Parse()
 
 	if addr == "" {
@@ -269,6 +276,14 @@ func main() {
 
 	if idleTimeout < 10 {
 		idleTimeout = 10
+	}
+
+	if logfile != "" {
+		log.Default.Out = &log.FixedSizeFileWriter{
+			MaxCount: 4,
+			Name:     logfile,
+			MaxSize:  10 * 1024 * 1024,
+		}
 	}
 
 	if debug {
